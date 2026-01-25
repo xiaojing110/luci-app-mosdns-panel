@@ -1,4 +1,4 @@
-# Luci App MosDNS Panel
+# MosDNS 监控面板
 
 Luci App MosDNS Panel 是一个为 OpenWrt/LuCI 设计的 MosDNS 可视化监控面板。它提供了一个现代化的、响应式的 Web 界面，用于监控 MosDNS 的运行状态、管理缓存、查看统计图表以及执行常见的维护操作。
 
