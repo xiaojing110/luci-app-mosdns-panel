@@ -74,6 +74,7 @@ opkg install luci-app-mosdns-panel_*.ipk
 
 *   **API 地址**：默认连接 `http://127.0.0.1:9091`。请确保您的 MosDNS 配置文件中开启了 API 并监听该端口。
 *   **缓存恢复路径**：在执行“恢复缓存”操作时，默认会尝试从 `/etc/mosdns/` 目录加载对应的 `.dump` 文件。如果使用了自定义配置，请确保 `config_custom.yaml` 中的 `dump_file` 路径设置正确。
+*   **自定义配置**：本仓库的 `yaml` 目录下提供了推荐的 MosDNS 自定义配置文件（`config_custom.yaml`, `dat_exec.yaml`, `dns.yaml`）。如果您需要使用这些配置，请手动下载并上传至路由器的 `/etc/mosdns/` 目录。详细说明请参考 `yaml` 目录下的说明文档。
 
 ## 🤝 致谢与参考
 
