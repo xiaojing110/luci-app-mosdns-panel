@@ -8,6 +8,12 @@ LUCI_TITLE:=MosDNS Panel for LuCI
 LUCI_PKGARCH:=all
 LUCI_DEPENDS:=+luci-app-mosdns +luci-base +curl
 
+define Package/$(PKG_NAME)/conffiles
+/etc/mosdns/config_custom.yaml
+/etc/mosdns/dat_exec.yaml
+/etc/mosdns/dns.yaml
+endef
+
 include $(TOPDIR)/feeds/luci/luci.mk
 
 # call BuildPackage - OpenWrt buildroot signature
