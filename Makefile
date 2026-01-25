@@ -11,10 +11,7 @@ LUCI_TITLE:=MosDNS Panel for LuCI
 LUCI_PKGARCH:=all
 LUCI_DEPENDS:=+luci-app-mosdns +luci-base +curl
 
-define Build/Prepare
-	mkdir -p $(PKG_BUILD_DIR)
-	$(CP) ./* $(PKG_BUILD_DIR)/
-endef
+PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
 
 include $(TOPDIR)/feeds/luci/luci.mk
 
