@@ -16,9 +16,7 @@ Luci App MosDNS Panel 是一个为 OpenWrt/LuCI 设计的 MosDNS 可视化管理
 2.  导航至 **服务 (Services)** -> **MosDNS**。
 3.  点击 **面板 (Panel)** 选项卡（通常位于“日志”选项卡的右侧）。
 
-<div align="center">
-  <img src="img/Panel.png" width="300" alt="Panel Entry Screenshot">
-</div>
+![Panel Entry Screenshot](img/Panel.png)
 
 ## ✨ 主要特性
 
