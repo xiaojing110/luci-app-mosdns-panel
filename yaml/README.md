@@ -20,12 +20,12 @@
     然后依次添加如下的导出标签：
     **GeoSite标签**：cn、gfw、private、geolocation-!cn、category-ads-all
     **GeoIP标签**：cn、private
-    ![GeoData导出设置](img/GeoDataExport.png)
+    ![GeoData导出设置](../img/GeoData.png)
 
 3.  **设置自定义配置**：
     - 上传完成并设置完成GeoData导出后，进入 MosDNS 设置界面 -> **基本设置** -> **基本选项** -> **配置文件** -> 勾选 **自定义配置**。
     此时编辑器中应该会出现上传的`config_custom.yaml`文件中的内容，如果没有出现可以通过手动复制的方式添加。
-    ![自定义配置设置](img/Config_Custom.png)
+    ![自定义配置设置](../img/Config_Custom.png)
 4. **启动Mosdns**
     - 所有配置确认没有问题之后点击下方的“保存并应用”按钮启动Mosdns服务。
     - 启动完成后可以在 MosDNS “面板”选项卡中查看服务状态。
