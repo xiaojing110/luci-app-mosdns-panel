@@ -43,14 +43,6 @@ plugins:
 
   ################# 可执行插件 ################
 
-  # 乐观缓存
-  - tag: lazy_cache
-    type: cache
-    args:
-      size: 8192
-      lazy_cache_ttl: 86400
-      dump_file: /etc/mosdns/cache.dump
-      dump_interval: 3600
   # 国内缓存
   - tag: cache_cn
     type: cache
