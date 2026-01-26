@@ -16,23 +16,14 @@ plugins:
     args:
       files:
         - "/var/mosdns/geosite_cn.txt"
-  
-  - tag: whitelist # 白名单
-    type: domain_set
-    args:
-      files:
-        - "/etc/mosdns/rule/whitelist.txt"
+        - "/etc/mosdns/rule/whitelist.txt"      
 
-  - tag: geosite_gfw # gfw 域名
+  - tag: geosite_nocn # gfw 域名
     type: domain_set
     args:
       files:
         - "/var/mosdns/geosite_gfw.txt"
         - "/etc/mosdns/rule/greylist.txt" #灰名单
-  - tag: geosite_location-!cn # 非 cn 域名
-    type: domain_set
-    args:
-      files:
         - "/var/mosdns/geosite_geolocation-!cn.txt"
   
   - tag: geosite_ads-all # 广告域名
@@ -60,12 +51,12 @@ plugins:
       dump_file: /etc/mosdns/cache_cn.dump
       dump_interval: 3600
   # 国外缓存
-  - tag: cache_google
+  - tag: cache_nocn
     type: cache
     args:
       size: 131072
       lazy_cache_ttl: 86400
-      dump_file: /etc/mosdns/cache_google.dump
+      dump_file: /etc/mosdns/cache_nocn.dump
       dump_interval: 3600
 
   # # exec
@@ -79,7 +70,7 @@ plugins:
   #   type: sequence
   #   args:
   #     - exec: ecs
-
+  
   # no ecs
   - tag: no_ecs
     type: "ecs_handler"
@@ -100,13 +91,8 @@ plugins:
       mask4: 24 # ipv4 掩码。默认 24
       mask6: 48 # ipv6 掩码。默认 48
 
-  - tag: drop_polluted
-    type: sequence
-    args:
-      - matches: resp_ip 61.160.148.90/24 221.228.32.13/24 114.237.67.59/24 117.69.71.58/24 180.109.0.0/16 4.36.66.178 8.7.198.45 37.61.54.158 46.82.174.68 59.24.3.173 64.33.88.161 78.16.49.15 93.46.8.89 159.106.121.75 202.106.1.2 202.181.7.85 203.161.230.171 209.145.54.50 211.94.66.147 216.234.179.13 243.185.187.39
-        exec: drop_resp
-
-  # 调整 ttl
+  # 调整TTL的插件
+  # [1m|5m|1h]
   - tag: ttl_1m
     type: sequence
     args:

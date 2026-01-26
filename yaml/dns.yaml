@@ -132,31 +132,15 @@ plugins:
         - addr: "tls://dot.pub"
           dial_addr: "120.53.53.53"
           enable_pipeline: true
-          
-  # 电信 dns
-  - tag: ctcc
+  
+  # local dns
+  - tag: local
     type: forward
     args:
       concurrent: 1
       upstreams:
         - addr: 218.4.4.4
         - addr: 218.2.2.2
-  
-  # local dns
-  - tag: forward_local
-    type: forward
-    args:
-      concurrent: 1
-      upstreams:
-        - addr: "udp://127.0.0.1:53"
-  
-  # remote dns
-  - tag: forward_remote
-    type: forward
-    args:
-      concurrent: 1
-      upstreams:
-        - addr: 127.0.0.1:7874 
 
   # server 失败
   - tag: reject_2

@@ -117,87 +117,91 @@ function action_restore_dump(plugin_name)
     local sys = require "luci.sys"
     local http = require "luci.http"
     local jsonc = require "luci.jsonc"
-    local fs = require "nixio.fs"
     
+    http.prepare_content("application/json")
+
     if not plugin_name then
-        http.prepare_content("application/json")
         http.write(jsonc.stringify({success=false, error="Plugin name is required"}))
         return
     end
 
+    -- Sanitize plugin name
+    plugin_name = plugin_name:gsub("[^%w_%-]", "")
+
     -- 1. Determine Port
     local port = "9091"
-    local check = sys.exec("curl -s --max-time 1 http://127.0.0.1:9091/metrics | head -n 1")
-    if not check or check == "" then
+    if sys.call("curl -s --max-time 1 http://127.0.0.1:9091/metrics >/dev/null 2>&1") ~= 0 then
         port = "9099"
     end
 
     -- 2. Determine Dump File Path
-    -- Default path
-    local dump_file = "/etc/mosdns/" .. plugin_name .. ".dump"
+    -- Strategy: Scan YAML config first to verify plugin usage and get dump_file path
+    local dump_file = nil
+    local config_found = false
     
-    -- Check if default file exists
-    if not fs.access(dump_file) then
-        -- Try to find in any .yaml file in /etc/mosdns/
-        local config_dir = "/etc/mosdns/"
-        local dir_iter = fs.dir(config_dir)
-        local found_in_config = false
-        
-        if dir_iter then
-            for filename in dir_iter do
-                if filename:match("%.yaml$") then
-                    local filepath = config_dir .. filename
-                    local file = io.open(filepath, "r")
-                    if file then
-                        local content = file:read("*a")
-                        file:close()
+    local yamls = sys.exec("ls /etc/mosdns/*.yaml 2>/dev/null")
+    if yamls and yamls ~= "" then
+        for filename in yamls:gmatch("[^\r\n]+") do
+            local file = io.open(filename, "r")
+            if file then
+                local content = file:read("*a")
+                file:close()
+                
+                if content then
+                    local in_target_block = false
+                    for line in content:gmatch("[^\r\n]+") do
+                        -- Check for ANY tag start: "- tag: name"
+                        local tag_val = line:match("^%s*-%s*tag:%s*['\"]?([%w_%-]+)['\"]?")
                         
-                        -- Simple parsing to find the tag and its dump_file
-                        -- We look for "- tag: plugin_name" and then scan for "dump_file: path" within that block
-                        local current_tag = nil
-                        for line in content:gmatch("[^\r\n]+") do
-                            -- Check for tag definition
-                            local tag_match = line:match("tag:%s*([%w_%-]+)")
-                            if tag_match then
-                                current_tag = tag_match
+                        if tag_val then
+                            -- New tag found
+                            if tag_val == plugin_name then
+                                in_target_block = true
+                                config_found = true
+                            else
+                                in_target_block = false
                             end
-                            
-                            -- If we are in the correct tag block, look for dump_file
-                            if current_tag == plugin_name then
-                                local f = line:match("dump_file:%s*(.+)")
-                                if f then
-                                    dump_file = f:gsub("^%s*(.-)%s*$", "%1") -- trim whitespace
-                                    -- Remove quotes if present
-                                    dump_file = dump_file:gsub("^['\"]", ""):gsub("['\"]$", "")
-                                    found_in_config = true
-                                    break
-                                end
+                        elseif in_target_block then
+                            -- Inside the target block, look for dump_file
+                            local d = line:match("^%s*dump_file:%s*(.+)")
+                            if d then
+                                -- Remove comments if any
+                                d = d:gsub("%s*#.*$", "")
+                                -- Trim whitespace and quotes
+                                dump_file = d:gsub("^%s*(.-)%s*$", "%1"):gsub("['\"]", "")
+                                break -- Found the dump file, stop scanning this file
                             end
-                        end
-                        
-                        if found_in_config then
-                            break
                         end
                     end
                 end
             end
+            -- If we found the config and the dump_file, we can stop searching all files
+            if config_found and dump_file then break end
         end
     end
 
-    -- 3. Final Check
-    if not fs.access(dump_file) then
-        http.prepare_content("application/json")
+    -- 3. Validation and Fallback
+    if not config_found then
+        http.write(jsonc.stringify({success=false, error="未在配置文件中找到插件: " .. plugin_name}))
+        return
+    end
+
+    -- If config found but no dump_file specified, use default
+    if not dump_file then
+        dump_file = "/etc/mosdns/" .. plugin_name .. ".dump"
+    end
+
+    -- 4. Check file existence
+    if sys.call("test -f " .. dump_file) ~= 0 then
         http.write(jsonc.stringify({success=false, error="未找到本地缓存文件: " .. dump_file}))
         return
     end
 
-    -- 4. Execute Curl
-    -- curl -X POST http://127.0.0.1:9091/plugins/<plugin>/load_dump -H "Content-Type: application/octet-stream" --data-binary @<file>
+    -- 5. Execute Curl
+
     local cmd = string.format("curl -s -X POST http://127.0.0.1:%s/plugins/%s/load_dump -H 'Content-Type: application/octet-stream' --data-binary '@%s'", port, plugin_name, dump_file)
-    
     local exit_code = sys.call(cmd)
 
-    http.prepare_content("application/json")
     if exit_code == 0 then
         http.write(jsonc.stringify({success=true, message="已恢复缓存规则", file=dump_file}))
     else
@@ -226,8 +230,8 @@ function action_plugins(...)
         -- Using grep -aoE '([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}\.?'
         local cmd
         if path == "cache_all/dump" then
-            -- Special handling for cache_all: combine cache_cn and cache_google
-            cmd = string.format("(curl -s --max-time 10 'http://127.0.0.1:%s/plugins/cache_cn/dump' | gunzip -c | grep -aoE '([a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,}\\.?'; curl -s --max-time 10 'http://127.0.0.1:%s/plugins/cache_google/dump' | gunzip -c | grep -aoE '([a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,}\\.?')", port, port)
+            -- Special handling for cache_all: combine cache_cn and cache_nocn
+            cmd = string.format("(curl -s --max-time 10 'http://127.0.0.1:%s/plugins/cache_cn/dump' | gunzip -c | grep -aoE '([a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,}\\.?'; curl -s --max-time 10 'http://127.0.0.1:%s/plugins/cache_nocn/dump' | gunzip -c | grep -aoE '([a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,}\\.?')", port, port)
         else
             cmd = string.format("curl -s --max-time 10 'http://127.0.0.1:%s/plugins/%s' | gunzip -c | grep -aoE '([a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,}\\.?'", port, path)
         end

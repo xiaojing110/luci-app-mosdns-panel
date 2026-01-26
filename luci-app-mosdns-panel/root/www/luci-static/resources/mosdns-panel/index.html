@@ -178,7 +178,7 @@
         function formatUptime(startTime) { if (!startTime) return 'N/A'; const uptime = (Date.now() / 1000) - startTime; return formatDuration(uptime); }
 
         const iconMap = { '请求总数': 'fa-globe', '缓存命中': 'fa-check-circle', '过期缓存命中': 'fa-history', '缓存命中率': 'fa-bullseye', '过期缓存命中率': 'fa-bullseye', '缓存条目数': 'fa-database', '启动时间': 'fa-power-off', 'CPU 时间': 'fa-microchip', '常驻内存 (RSS)': 'fa-memory', '待用堆内存 (Idle)': 'fa-box-open', 'Go 版本': 'fa-code-branch', '线程数': 'fa-sitemap', '打开文件描述符': 'fa-folder-open', };
-        const cacheOrder = ['cache_all', 'cache_cn', 'cache_google', 'lazy_cache']; const cacheTitles = { 'cache_all': '全部缓存', 'cache_cn': '国内缓存', 'cache_google': '国外缓存', 'lazy_cache': '乐观缓存' };
+        const cacheOrder = ['cache_all', 'cache_cn', 'cache_nocn', 'lazy_cache']; const cacheTitles = { 'cache_all': '全部缓存', 'cache_cn': '国内缓存', 'cache_nocn': '国外缓存', 'lazy_cache': '乐观缓存' };
         
         const themeMap = {
             'light': { name: '默认亮色', icon: 'fa-sun', cssVars: { '--bg-color': '#f7f9fd', '--text-color': '#2c3e50', '--card-bg': '#ffffff', '--card-shadow': '0 6px 18px rgba(0, 0, 0, 0.08)', '--border-color': '#e0e6ec', '--accent-color': '#4a90e2', '--label-color': '#7f8c8d', '--value-color': '#34495e', '--control-bg': '#f0f4f7', '--control-border': '#d5dce2', '--control-text': '#5e727e', '--control-hover-bg': '#e5edf3', '--control-active-bg': '#4a90e2', '--control-active-text': '#ffffff', '--gradient-start': '#4a90e2', '--gradient-mid': '#2e86de', '--gradient-end': '#4a90e2' }, chartColors: { hit: 'rgba(74, 144, 226, 0.7)', miss: 'rgba(189, 195, 199, 0.3)', hitBorder: '#4a90e2', missBorder: '#bdc3c7', text: '#2c3e50' } },
@@ -189,9 +189,9 @@
         const isEmbedded = urlParams.get('mode') === 'embedded';
         let visibleCards;
         if (isEmbedded) {
-            visibleCards = JSON.parse(localStorage.getItem('visibleMosdnsCards_embedded')) || ['cache_cn', 'cache_google'];
+            visibleCards = JSON.parse(localStorage.getItem('visibleMosdnsCards_embedded')) || ['cache_cn', 'cache_nocn'];
         } else {
-            visibleCards = JSON.parse(localStorage.getItem('visibleMosdnsCards')) || ['cache_all', 'cache_cn', 'cache_google'];
+            visibleCards = JSON.parse(localStorage.getItem('visibleMosdnsCards')) || ['cache_all', 'cache_cn', 'cache_nocn'];
         }
         
         function updateThemeButtons(activeMode) { const ts = getById('theme-selector'); ts.innerHTML = ''; ['light', 'dark'].forEach(mode => { if (!themeMap[mode]) return; const t = themeMap[mode]; const btn = createElement('button', 'control-base-label'); btn.dataset.theme = mode; btn.innerHTML = `<i class="fas ${t.icon}"></i> ${t.name}`; if (mode === activeMode) btn.classList.add('active'); btn.onclick = () => setTheme(mode); ts.appendChild(btn); }); }
@@ -301,9 +301,9 @@
             if (data.error) { getById('main-content').innerHTML = `<div class="error-message"><i class="fas fa-exclamation-triangle"></i><p>无法连接到 MosDNS API。</p><small>${data.error}</small></div>`; if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; getById('auto-refresh-toggle').checked = false; localStorage.setItem('autoRefresh', 'false');} return; }
             if (forceRebuild) { getById('main-content').innerHTML = ''; Object.values(chartInstances).forEach(c => c.destroy()); chartInstances = {}; }
             
-            // Calculate cache_all as sum of cache_cn and cache_google
+            // Calculate cache_all as sum of cache_cn and cache_nocn
             const cn = data.caches['cache_cn'] || { query_total: 0, hit_total: 0, lazy_hit_total: 0, size_current: 0 };
-            const google = data.caches['cache_google'] || { query_total: 0, hit_total: 0, lazy_hit_total: 0, size_current: 0 };
+            const google = data.caches['cache_nocn'] || { query_total: 0, hit_total: 0, lazy_hit_total: 0, size_current: 0 };
             const totalQuery = (cn.query_total || 0) + (google.query_total || 0);
             const totalHit = (cn.hit_total || 0) + (google.hit_total || 0);
             const totalLazyHit = (cn.lazy_hit_total || 0) + (google.lazy_hit_total || 0);
@@ -363,7 +363,7 @@
             
             getById('restore-rules-btn').onclick = () => {
                 if(confirm('确定恢复所有缓存规则吗?')) {
-                    const caches = ['cache_cn', 'cache_google', 'lazy_cache'];
+                    const caches = ['cache_cn', 'cache_nocn', 'lazy_cache'];
                     Promise.all(caches.map(plugin => 
                         fetch(`/cgi-bin/luci/mosdns_panel/api/restore_dump/${plugin}`)
                             .then(res => res.json())
@@ -378,7 +378,7 @@
                 }
             };
 
-            multiAction('flush-rules-btn', ['cache_cn/flush', 'cache_google/flush', 'lazy_cache/flush'], '确定清空所有缓存规则吗?');
+            multiAction('flush-rules-btn', ['cache_cn/flush', 'cache_nocn/flush', 'lazy_cache/flush'], '确定清空所有缓存规则吗?');
             getById('restart-mosdns-btn').onclick = () => { 
                 if (confirm('确定重启 MosDNS 服务吗?')) {
                     fetch('/cgi-bin/luci/mosdns_panel/api/restart')
@@ -394,7 +394,7 @@
                         .catch(e => alert(`❌ 请求失败: ${e.message}`));
                 }
             };
-            const showEndpoints = { '总缓存': 'cache_all', 'CN 缓存': 'cache_cn', '!CN 缓存': 'cache_google', '乐观缓存': 'lazy_cache' };
+            const showEndpoints = { '总缓存': 'cache_all', 'CN 缓存': 'cache_cn', '!CN 缓存': 'cache_nocn', '乐观缓存': 'lazy_cache' };
             const dvContainer = getById('data-view-buttons'); dvContainer.innerHTML = ''; Object.entries(showEndpoints).forEach(([name, path]) => { const btn = createElement('button', 'data-view-group-btn'); btn.textContent = name; btn.onclick = () => window.open(`/cgi-bin/luci/mosdns_panel/plugins/${path}/dump`, '_blank'); dvContainer.appendChild(btn); });
             const tabButtons = D.querySelectorAll('.tab-button'); const tabContents = D.querySelectorAll('.tab-content');
             tabButtons.forEach(button => { button.addEventListener('click', () => { tabButtons.forEach(btn => btn.classList.remove('active')); button.classList.add('active'); tabContents.forEach(content => content.classList.toggle('active', content.id === `tab-${button.dataset.tab}`)); }); });
