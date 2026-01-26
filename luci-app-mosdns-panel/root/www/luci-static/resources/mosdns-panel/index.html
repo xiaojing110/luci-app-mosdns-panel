@@ -658,32 +658,79 @@
         }
 
         function exportLogs() {
-            // Respect current filters
-            const level = getById('log-filter-level').value;
-            const text = getById('log-filter-text').value.toLowerCase();
+            // Find the export button to show loading state
+            const exportBtn = document.querySelector('button[onclick="exportLogs()"]');
+            const originalIcon = exportBtn ? exportBtn.innerHTML : '';
             
-            const filtered = logDataCache.filter(log => {
-                if (lastLogClearTime > 0 && log._ts <= lastLogClearTime) return false;
-                if (level !== 'ALL' && log.level !== level) return false;
-                if (text && !log._raw.toLowerCase().includes(text)) return false;
-                return true;
-            });
-            
-            if (filtered.length === 0) {
-                alert('没有可导出的日志 (当前筛选结果为空)');
-                return;
+            if (exportBtn) {
+                exportBtn.disabled = true;
+                exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                exportBtn.style.cursor = 'wait';
             }
-            
-            const content = filtered.map(log => log._raw).join('\n');
-            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `mosdns-logs-${new Date().toISOString().slice(0,19).replace(/T|:/g,'-')}.log`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+
+            // Use setTimeout to yield to main thread for UI update
+            setTimeout(() => {
+                try {
+                    const level = getById('log-filter-level').value;
+                    const text = getById('log-filter-text').value.toLowerCase();
+                    
+                    const filtered = logDataCache.filter(log => {
+                        if (lastLogClearTime > 0 && log._ts <= lastLogClearTime) return false;
+                        if (level !== 'ALL' && log.level !== level) return false;
+                        if (text && !log._raw.toLowerCase().includes(text)) return false;
+                        return true;
+                    });
+                    
+                    if (filtered.length === 0) {
+                        alert('没有可导出的日志 (当前筛选结果为空)');
+                        return;
+                    }
+                    
+                    // Generate content with converted timezone (Asia/Shanghai)
+                    // Using map to create array of strings is more efficient for Blob than joining a huge string
+                    const contentChunks = filtered.map(log => {
+                        // Replace the original timestamp (assumed at start) with the formatted local time
+                        let line = log._raw;
+                        // Try tab separation first (MosDNS standard)
+                        const tabIndex = line.indexOf('\t');
+                        if (tabIndex > -1) {
+                            return log.time + line.substring(tabIndex) + '\n';
+                        }
+                        // Fallback: replace first non-whitespace sequence
+                        return line.replace(/^\S+/, log.time) + '\n';
+                    });
+                    
+                    const blob = new Blob(contentChunks, { type: 'text/plain;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    // Generate filename with local time
+                    const now = new Date();
+                    const timestamp = now.toLocaleString('zh-CN', {
+                        timeZone: 'Asia/Shanghai',
+                        year: 'numeric', month: '2-digit', day: '2-digit',
+                        hour: '2-digit', minute: '2-digit', second: '2-digit',
+                        hour12: false
+                    }).replace(/[\/\s:]/g, ''); // Result: YYYYMMDDHHmmss
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `mosdns-logs-${timestamp}.log`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    
+                } catch (e) {
+                    console.error('Export error:', e);
+                    alert('导出出错: ' + e.message);
+                } finally {
+                    if (exportBtn) {
+                        exportBtn.disabled = false;
+                        exportBtn.innerHTML = originalIcon;
+                        exportBtn.style.cursor = '';
+                    }
+                }
+            }, 50);
         }
 
         function createLogModal() {
