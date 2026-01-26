@@ -29,7 +29,7 @@ jobs:
         id: sdk-cache
         uses: actions/cache@v4
         with:
-          path: /tmp/sdk
+          path: ./sdk
           key: openwrt-sdk-${{ matrix.arch }}-${{ matrix.sdk }}-${{ hashFiles('luci-app-mosdns-panel/Makefile') }}
           restore-keys: |
             openwrt-sdk-${{ matrix.arch }}-${{ matrix.sdk }}-
@@ -46,7 +46,7 @@ jobs:
           FEEDNAME: packages_ci
           PACKAGES: luci-app-mosdns-panel
           NO_REFRESH_CHECK: true
-          SDK_CACHE_PATH: /tmp/sdk
+          SDK_CACHE_PATH: ./sdk
           
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
