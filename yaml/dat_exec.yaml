@@ -34,23 +34,23 @@ plugins:
     args:
       files:
         - "/var/mosdns/geosite_geolocation-!cn.txt"
+  
   - tag: geosite_ads-all # 广告域名
     type: domain_set
     args:
       files:
         - "/var/mosdns/geosite_category-ads-all.txt"
         - "/etc/mosdns/rule/blocklist.txt"  #黑名单
+  
+  # Hosts 插件
+  - tag: hosts
+    type: hosts
+    args:
+      files:
+        - "/etc/mosdns/rule/hosts.txt"
 
   ################# 可执行插件 ################
 
-  # 乐观缓存
-  - tag: lazy_cache
-    type: cache
-    args:
-      size: 8192
-      lazy_cache_ttl: 86400
-      dump_file: /etc/mosdns/cache.dump
-      dump_interval: 3600
   # 国内缓存
   - tag: cache_cn
     type: cache
@@ -99,6 +99,12 @@ plugins:
       send: false # 是否发送 ecs
       mask4: 24 # ipv4 掩码。默认 24
       mask6: 48 # ipv6 掩码。默认 48
+
+  - tag: drop_polluted
+    type: sequence
+    args:
+      - matches: resp_ip 61.160.148.90/24 221.228.32.13/24 114.237.67.59/24 117.69.71.58/24 180.109.0.0/16 4.36.66.178 8.7.198.45 37.61.54.158 46.82.174.68 59.24.3.173 64.33.88.161 78.16.49.15 93.46.8.89 159.106.121.75 202.106.1.2 202.181.7.85 203.161.230.171 209.145.54.50 211.94.66.147 216.234.179.13 243.185.187.39
+        exec: drop_resp
 
   # 调整 ttl
   - tag: ttl_1m

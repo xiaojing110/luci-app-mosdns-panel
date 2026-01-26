@@ -152,17 +152,18 @@ function action_restore_dump(plugin_name)
                         local content = file:read("*a")
                         file:close()
                         
-                        local in_tag = false
+                        -- Simple parsing to find the tag and its dump_file
+                        -- We look for "- tag: plugin_name" and then scan for "dump_file: path" within that block
+                        local current_tag = nil
                         for line in content:gmatch("[^\r\n]+") do
-                            -- Check for tag start
-                            if line:match("tag:%s*" .. plugin_name) then
-                                in_tag = true
-                            elseif line:match("tag:") then
-                                -- New tag starts, current tag scope ends
-                                in_tag = false
+                            -- Check for tag definition
+                            local tag_match = line:match("tag:%s*([%w_%-]+)")
+                            if tag_match then
+                                current_tag = tag_match
                             end
                             
-                            if in_tag then
+                            -- If we are in the correct tag block, look for dump_file
+                            if current_tag == plugin_name then
                                 local f = line:match("dump_file:%s*(.+)")
                                 if f then
                                     dump_file = f:gsub("^%s*(.-)%s*$", "%1") -- trim whitespace
