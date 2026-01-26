@@ -7,6 +7,8 @@ function index()
     entry({"mosdns_panel", "api", "upload_background"}, call("action_upload_background")).public = true
     entry({"mosdns_panel", "api", "remove_background"}, call("action_remove_background")).public = true
     entry({"mosdns_panel", "api", "restart"}, call("action_restart")).public = true
+    entry({"mosdns_panel", "api", "get_log"}, call("action_get_log")).public = true
+    entry({"mosdns_panel", "api", "clear_log"}, call("action_clear_log")).public = true
     entry({"mosdns_panel", "api", "restore_dump"}, call("action_restore_dump")).leaf = true
     entry({"mosdns_panel", "plugins"}, call("action_plugins")).leaf = true
 end
@@ -268,5 +270,68 @@ function action_plugins(...)
         
         http.prepare_content("text/plain; charset=utf-8")
         http.write(content)
+    end
+end
+
+function action_get_log()
+    local sys = require "luci.sys"
+    local http = require "luci.http"
+    local jsonc = require "luci.jsonc"
+
+    http.prepare_content("application/json")
+
+    -- Default log path
+    local log_file = "/var/log/mosdns.log"
+    
+    -- Check if default file exists
+    if sys.call("test -f " .. log_file) ~= 0 then
+        -- Try to find in config files as fallback
+        local config_dir = "/etc/mosdns/"
+        local yamls = sys.exec("ls " .. config_dir .. "*.yaml 2>/dev/null")
+        local found = false
+        if yamls then
+            for filename in yamls:gmatch("[^\r\n]+") do
+                local file = io.open(filename, "r")
+                if file then
+                    local content = file:read("*a")
+                    file:close()
+                    -- Look for "file: /path/to/log" inside "log:" block?
+                    -- Simple heuristic: look for "file:.*log"
+                    local f = content:match("file:%s*[\"']?([^\"'\r\n]+%.log)[\"']?")
+                    if f then
+                        log_file = f
+                        found = true
+                        break
+                    end
+                end
+            end
+        end
+        
+        if not found and sys.call("test -f " .. log_file) ~= 0 then
+            http.write(jsonc.stringify({success=false, error="Log file not found at " .. log_file}))
+            return
+        end
+    end
+
+    -- Read last 1000 lines
+    local content = sys.exec("tail -n 3000 " .. log_file)
+    
+    http.write(jsonc.stringify({success=true, content=content, file=log_file}))
+end
+
+function action_clear_log()
+    local sys = require "luci.sys"
+    local http = require "luci.http"
+    local jsonc = require "luci.jsonc"
+
+    local log_file = "/var/log/mosdns.log"
+    -- Try to clear the log file
+    local code = sys.call(": > " .. log_file)
+    
+    http.prepare_content("application/json")
+    if code == 0 then
+        http.write(jsonc.stringify({success=true}))
+    else
+        http.write(jsonc.stringify({success=false, error="Failed to clear log file"}))
     end
 end
