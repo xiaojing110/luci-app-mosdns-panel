@@ -48,29 +48,22 @@ plugins:
   - tag: cache_cn_hit
     type: sequence
     args:
-      - exec: $cache_cn
-      - matches: has_resp
-        exec: query_summary cache_cn_hit
-      - matches: has_resp
-        exec: accept
+      - exec: query_summary cache_cn_hit
+      - exec: accept
 
   - tag: cache_nocn_hit
     type: sequence
     args:
-      - exec: $cache_nocn
-      - matches: has_resp
-        exec: query_summary cache_nocn_hit
-      - matches: has_resp
-        exec: accept
+      - exec: query_summary cache_nocn_hit
+      - exec: accept
+      
 
   - tag: cache_lazy_hit
     type: sequence
     args:
-      - exec: $lazy_cache
-      - matches: has_resp
-        exec: query_summary cache_lazy_hit
-      - matches: has_resp
-        exec: accept
+      - exec: query_summary cache_lazy_hit
+      - exec: accept
+      
 
   # DNS查询通知(dns_seq)
   - tag: dns_cn_seq
@@ -109,7 +102,9 @@ plugins:
     type: sequence
     args:
       - exec: prefer_ipv4
-      - exec: $cache_cn_hit
+      - exec: $cache_cn
+      - matches: has_resp
+        exec: jump cache_cn_hit
       - exec: $ecs_cn
       - exec: $dns_cn_seq
       - matches: "!resp_ip $geoip_cn" # 响应非 cn ip
@@ -120,7 +115,8 @@ plugins:
     type: sequence
     args:
       - exec: prefer_ipv4
-      - exec: $cache_nocn_hit
+      - matches: has_resp
+        exec: jump cache_nocn_hit
       - exec: $no_ecs
       - exec: $dns_nocn_seq
       - matches: "resp_ip $geoip_cn" # 响应为 cn ip
@@ -131,7 +127,9 @@ plugins:
     type: sequence
     args:
       - exec: prefer_ipv4
-      - exec: $cache_lazy_hit
+      - exec: $lazy_cache
+      - matches: has_resp
+        exec: jump cache_lazy_hit
       - exec: $no_ecs
       - exec: $fallback_seq
     
@@ -139,7 +137,9 @@ plugins:
   - tag: query_lan
     type: sequence
     args:
-      - exec: $cache_cn_hit
+      - exec: $cache_cn
+      - matches: has_resp
+        exec: jump cache_cn_hit
       # - exec: $no_ecs
       - exec: $local_seq
 
@@ -147,7 +147,9 @@ plugins:
   - tag: query_other 
     type: sequence
     args:
-      - exec: $cache_lazy_hit
+      - exec: $lazy_cache
+      - matches: has_resp
+        exec: jump cache_lazy_hit
       - exec: $no_ecs 
       - exec: $other_seq
 
