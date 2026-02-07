@@ -17,14 +17,19 @@ jobs:
       matrix:
         arch:
           - x86_64
+          - aarch64_generic
+          - mipsel_24kc
+          - arm_cortex-a7_neon-vfpv4
+          # 如果你要支援 RISC-V 或其他新架構，可再加：
+          # - riscv64
         sdk:
-          - openwrt-24.10
+          - openwrt-24.10    # 保持單一版本，或之後再擴展成 matrix
 
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       - name: Sync PKG_VERSION with tag
         run: |
           version="${GITHUB_REF_NAME#v}"
@@ -37,14 +42,14 @@ jobs:
           FEEDNAME: packages_ci
           PACKAGES: luci-app-mosdns-panel
           NO_REFRESH_CHECK: true
-          
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.arch }}-${{ matrix.sdk }}
-          path: bin/packages/${{ matrix.arch }}/packages_ci/*.ipk
+          path: bin/packages/**/*.ipk    # 改成 ** 通配，比較保險
 
-      - name: Upload packages
+      - name: Upload to Release
         uses: ncipollo/release-action@v1
         with:
           name: ${{ github.ref_name }}
@@ -52,7 +57,7 @@ jobs:
           allowUpdates: true
           replacesArtifacts: true
           prerelease: false
-          artifacts: "bin/packages/${{ matrix.arch }}/packages_ci/*.ipk"
+          artifacts: "bin/packages/**/*.ipk"
 
   package-config:
     name: Package Config
