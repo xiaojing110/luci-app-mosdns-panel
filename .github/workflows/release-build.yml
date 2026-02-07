@@ -1,9 +1,9 @@
 name: Build and Release MosDNS Panel
 
 on:
-  workflow_dispatch:  # 手动触发，在 Actions 页面会出现 "Run workflow" 按钮
+  workflow_dispatch:
     inputs:
-      custom_version:  # 可选：如果你想覆盖源码里的版本，手动输入
+      custom_version:
         description: '自定义版本号 (留空则自动读取 Makefile + 日期)'
         required: false
         default: ''
@@ -31,62 +31,60 @@ jobs:
         with:
           fetch-depth: 0
 
-      # ── 读取源码版本 + 生成最终版本号 ──
+      # 读取版本号
       - name: Determine version
         id: get_version
         run: |
-          # 从 Makefile 读取 PKG_VERSION（去掉 PKG_VERSION:= 前缀）
           PKG_VER=$(grep '^PKG_VERSION:=' luci-app-mosdns-panel/Makefile | cut -d'=' -f2 | tr -d ' ')
           
           if [ -n "${{ inputs.custom_version }}" ]; then
             FINAL_VER="${{ inputs.custom_version }}"
-            echo "Using custom version: $FINAL_VER"
           elif [ -n "$PKG_VER" ] && [ "$PKG_VER" != "unknown" ]; then
             FINAL_VER="$PKG_VER"
-            echo "Using PKG_VERSION from Makefile: $FINAL_VER"
           else
-            # fallback 到日期时间 (Asia/Shanghai 时区)
             TIMESTAMP=$(TZ=Asia/Shanghai date +%Y%m%d_%H%M)
             FINAL_VER="dev-$TIMESTAMP"
-            echo "No valid PKG_VERSION, using date fallback: $FINAL_VER"
           fi
           
-          # 清理版本号（避免特殊字符影响 tag）
           CLEAN_VER=$(echo "$FINAL_VER" | sed 's/[^a-zA-Z0-9._-]/-/g')
-          
           echo "version=$CLEAN_VER" >> $GITHUB_OUTPUT
-          echo "PKG_VERSION=$FINAL_VER" >> $GITHUB_ENV   # 用于后续 Makefile 修改（可选）
+          echo "PKG_VERSION=$FINAL_VER" >> $GITHUB_ENV
 
-      # 如果你仍想同步 Makefile（可选，现在很多时候不改 Makefile 也行）
+      # 可选：同步 Makefile 版本
       - name: Sync PKG_VERSION (optional)
         if: env.PKG_VERSION != ''
         run: |
           sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=${{ env.PKG_VERSION }}/" luci-app-mosdns-panel/Makefile
 
-      - name: Build Packages
-        uses: sbwml/openwrt-gh-action-sdk@go1.25
+      # 核心：只构建本地包，禁用默认 feeds
+      - name: Build Only Local Package
+        uses: sbwml/openwrt-gh-action-sdk@go1.25   # 或 openwrt/gh-action-sdk@main 如果你想换官方
         env:
           ARCH: ${{ matrix.arch }}-${{ matrix.sdk }}
           FEEDNAME: packages_ci
-          PACKAGES: luci-app-mosdns-panel
+          PACKAGES: luci-app-mosdns-panel   # 只指定你要的包
+          NO_DEFAULT_FEEDS: true            # ★关键：禁用 SDK 默认 feeds
           NO_REFRESH_CHECK: true
 
+      # 上传 artifact（只上传自己的 ipk）
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.arch }}-${{ matrix.sdk }}
-          path: bin/packages/**/*.ipk
+          path: bin/packages/${{ matrix.arch }}/packages_ci/luci-app-mosdns-panel*.ipk
+          if-no-files-found: error   # 如果没文件就报错，便于 debug
 
+      # 上传到 Release（只上传自己的 ipk）
       - name: Upload to Release
         uses: ncipollo/release-action@v1
         with:
-          tag: "v${{ steps.get_version.outputs.version }}"   # 自动创建 tag 如 v20260207-1430
-          name: "Release ${{ steps.get_version.outputs.version }}"  # release 标题
+          tag: "v${{ steps.get_version.outputs.version }}"
+          name: "Release ${{ steps.get_version.outputs.version }}"
           token: ${{ secrets.GITHUB_TOKEN }}
           allowUpdates: true
           replacesArtifacts: true
-          prerelease: true   # 建议 dev 版标 prerelease
-          artifacts: "bin/packages/**/*.ipk"
+          prerelease: true
+          artifacts: "bin/packages/${{ matrix.arch }}/packages_ci/luci-app-mosdns-panel*.ipk"
 
   package-config:
     name: Package Config
@@ -109,7 +107,7 @@ jobs:
       - name: Upload Config to Release
         uses: ncipollo/release-action@v1
         with:
-          tag: "v${{ steps.get_version.outputs.version }}"   # 与 build job 保持一致 tag
+          tag: "v${{ steps.get_version.outputs.version }}"
           name: "Release ${{ steps.get_version.outputs.version }}"
           token: ${{ secrets.GITHUB_TOKEN }}
           allowUpdates: true
