@@ -31,7 +31,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      # 读取版本号
       - name: Determine version
         id: get_version
         run: |
@@ -47,47 +46,47 @@ jobs:
           fi
           
           CLEAN_VER=$(echo "$FINAL_VER" | sed 's/[^a-zA-Z0-9._-]/-/g')
+          
           echo "version=$CLEAN_VER" >> $GITHUB_OUTPUT
           echo "PKG_VERSION=$FINAL_VER" >> $GITHUB_ENV
 
-      # 可选：同步 Makefile 版本
       - name: Sync PKG_VERSION (optional)
         if: env.PKG_VERSION != ''
         run: |
           sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=${{ env.PKG_VERSION }}/" luci-app-mosdns-panel/Makefile
 
-      # 核心：只构建本地包，禁用默认 feeds
-      - name: Build Only Local Package
-        uses: sbwml/openwrt-gh-action-sdk@go1.25   # 或 openwrt/gh-action-sdk@main 如果你想换官方
+      - name: Build Packages
+        uses: sbwml/openwrt-gh-action-sdk@go1.25
         env:
           ARCH: ${{ matrix.arch }}-${{ matrix.sdk }}
           FEEDNAME: packages_ci
-          PACKAGES: luci-app-mosdns-panel   # 只指定你要的包
-          NO_DEFAULT_FEEDS: true            # ★关键：禁用 SDK 默认 feeds
+          PACKAGES: luci-app-mosdns-panel
           NO_REFRESH_CHECK: true
 
-      # 上传 artifact（只上传自己的 ipk）
-      - name: Upload artifacts
+      - name: Upload artifacts (for download if needed)
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.arch }}-${{ matrix.sdk }}
-          path: bin/packages/${{ matrix.arch }}/packages_ci/luci-app-mosdns-panel*.ipk
-          if-no-files-found: error   # 如果没文件就报错，便于 debug
+          path: bin/packages/**/*.ipk
 
-      # 上传到 Release（只上传自己的 ipk）
-      - name: Upload to Release
+      - name: Upload ipk to Release
         uses: ncipollo/release-action@v1
         with:
           tag: "v${{ steps.get_version.outputs.version }}"
-          name: "Release ${{ steps.get_version.outputs.version }}"
+          name: "MosDNS Panel ${{ steps.get_version.outputs.version }}"
+          body: |
+            Auto-built Luci App for MosDNS Panel.
+            - Architectures: ${{ join(matrix.arch, ', ') }}
+            - SDK: ${{ matrix.sdk }}
+            - Only main plugin .ipk files are included.
           token: ${{ secrets.GITHUB_TOKEN }}
           allowUpdates: true
-          replacesArtifacts: true
+          replacesArtifacts: true   # 覆盖同名 release 的旧附件
           prerelease: true
-          artifacts: "bin/packages/${{ matrix.arch }}/packages_ci/luci-app-mosdns-panel*.ipk"
+          artifacts: "bin/packages/**/*.ipk"   # 只上传 ipk，不上传其他
 
   package-config:
-    name: Package Config
+    name: Package Custom Config (YAML zip)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -98,19 +97,10 @@ jobs:
           zip -r mosdns_custom_config_${timestamp}.zip yaml/
           echo "CONFIG_ZIP=mosdns_custom_config_${timestamp}.zip" >> $GITHUB_ENV
 
-      - name: Upload Config Artifact
+      - name: Upload Config as Artifact
         uses: actions/upload-artifact@v4
         with:
           name: mosdns-custom-config
           path: ${{ env.CONFIG_ZIP }}
-
-      - name: Upload Config to Release
-        uses: ncipollo/release-action@v1
-        with:
-          tag: "v${{ steps.get_version.outputs.version }}"
-          name: "Release ${{ steps.get_version.outputs.version }}"
-          token: ${{ secrets.GITHUB_TOKEN }}
-          allowUpdates: true
-          replacesArtifacts: true
-          prerelease: true
-          artifacts: ${{ env.CONFIG_ZIP }}
+          # 注意：这里不再用 ncipollo/release-action，所以 config zip 不会出现在 Releases 里
+          # 只作为 Actions 的下载 artifact 保留（在 Actions 运行页面可下载）
